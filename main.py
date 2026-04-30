@@ -9,25 +9,20 @@ import json
 import shutil
 from pygame.locals import *
 
-# Ajouter le chemin des ressources au système
+# Add resource path to system
 if getattr(sys, 'frozen', False):
-    # Mode exécutable (Nuitka ou PyInstaller)
     base_path = sys._MEIPASS
 else:
-    # Mode développement ou portable
     base_path = os.path.dirname(os.path.abspath(__file__))
 
-# Ajouter le chemin des ressources
 resources_path = os.path.join(base_path, 'resources')
 if resources_path not in sys.path:
     sys.path.insert(0, resources_path)
 
-# Pour Windows: définir l'icône de l'application au niveau du système
 if os.name == 'nt':
     import ctypes
     from ctypes import wintypes
 
-# Chemins des ressources
 def resource_path(relative_path):
     exe_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
     exe_resource = os.path.join(exe_dir, relative_path)
@@ -46,22 +41,14 @@ def resource_path(relative_path):
     
     return relative_path
 
-# Initialisation de Pygame
 pygame.init()
 pygame.mixer.init()
 
-# Configuration de la fenêtre sans bordure
 WIDTH, HEIGHT = 1092, 382
 screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.NOFRAME)
 pygame.display.set_caption("Silicon Valley Downloader")
 
-# --- GESTION DE L'ICÔNE ---
-print("\n" + "="*50)
-print("Initialisation de l'icône...")
-
 def load_application_icon():
-    """Charge l'icône de l'application depuis plusieurs emplacements possibles"""
-    
     icon_paths = [
         os.path.join(os.path.dirname(sys.executable), "SiliconValley.ico"),
         os.path.join(os.path.dirname(sys.executable), "resources", "SiliconValley.ico"),
@@ -91,30 +78,22 @@ def load_application_icon():
             try:
                 icon = pygame.image.load(icon_path)
                 pygame.display.set_icon(icon)
-                print(f"  ✓ Icône chargée : {os.path.basename(icon_path)}")
                 return True
             except:
                 continue
     
-    print("  ✗ Aucune icône valide trouvée")
     return False
 
-# Charger l'icône
 if not load_application_icon():
-    print("  ⚠ Utilisation de l'icône par défaut de Pygame")
+    print("Using default Pygame icon")
 
-# Pour Windows: définir l'AppUserModelID
 if os.name == 'nt':
     try:
         hwnd = pygame.display.get_wm_info()['window']
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("SiliconValley.Downloader.1.0")
-        print("  ✓ AppUserModelID défini")
-    except Exception as e:
-        print(f"  ✗ Erreur AppUserModelID : {e}")
+    except Exception:
+        pass
 
-print("="*50 + "\n")
-
-# Couleurs
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GRAY = (128, 128, 128)
@@ -127,17 +106,15 @@ RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
 TURQUOISE = (64, 224, 208)
 
-# Police
 font = pygame.font.SysFont('Arial', 12)
 big_font = pygame.font.SysFont('Arial', 14)
 loading_font = pygame.font.SysFont('Arial', 16)
 
-# Variables de l'application
 APP_NAME = "SiliconValley"
 output_dir = ""
 format_choice = "mp4"
 download_mode = "single"
-current_step = "loading"  # Changé de "enter_url" à "loading"
+current_step = "loading"
 status_message = ""
 urls_file_path = ""
 music_playing = False
@@ -161,54 +138,45 @@ updating = False
 update_status = ""
 download_completed = False
 loading_progress = 0.0
-loading_message = "Initialisation..."
-loading_steps = 6  # Nombre d'étapes de chargement
-loading_background_image = None  # Image de fond pour l'écran de chargement
-loading_logo_image = None  # Logo pour l'écran de chargement
+loading_message = "Initializing..."
+loading_background_image = None
+loading_logo_image = None
 
-# Variables globales pour les outils
 BASE_DIR = ""
 TOOLS_PATH = ""
 YTDLP = ""
 FFMPEG = ""
 ERROR_LOG = ""
 
-# CHARGEMENT DES IMAGES DE L'ÉCRAN DE CHARGEMENT (IMMÉDIATEMENT)
+# Playlist tracking
+playlist_total = 0
+playlist_done = 0
+
+# Overwrite/duplicate: "overwrite" or "duplicate" or "" (not decided)
+overwrite_choice = ""
+overwrite_existing_count = 0
+
 def load_loading_screen_images():
-    """Charge les images pour l'écran de chargement immédiatement"""
     global loading_background_image, loading_logo_image
     
-    print("Chargement des images pour l'écran de chargement...")
-    
-    # Charger l'image de fond
     try:
         bg_path = resource_path("resources/images/background.png")
         if os.path.exists(bg_path):
             loading_background_image = pygame.image.load(bg_path).convert()
             if loading_background_image.get_size() != (WIDTH, HEIGHT):
                 loading_background_image = pygame.transform.scale(loading_background_image, (WIDTH, HEIGHT))
-            print("  ✓ Background chargé")
-        else:
-            print(f"  ✗ Fichier non trouvé: {bg_path}")
-    except Exception as e:
-        print(f"  ✗ Erreur chargement background: {e}")
+    except Exception:
         loading_background_image = None
     
-    # Charger le logo
     try:
         logo_path = resource_path("resources/images/SILICON_VALLEY.png")
         if os.path.exists(logo_path):
             loading_logo_image = pygame.image.load(logo_path).convert_alpha()
-            print("  ✓ Logo chargé")
-        else:
-            print(f"  ✗ Fichier non trouvé: {logo_path}")
-    except Exception as e:
-        print(f"  ✗ Erreur chargement logo: {e}")
+    except Exception:
         loading_logo_image = None
     
     return loading_background_image is not None or loading_logo_image is not None
 
-# Fonction d'initialisation avec progression
 def init_directories_with_progress():
     global BASE_DIR, TOOLS_PATH, YTDLP, FFMPEG, ERROR_LOG, loading_progress, loading_message, updating, update_status
     
@@ -218,7 +186,7 @@ def init_directories_with_progress():
         base_path = os.path.dirname(os.path.abspath(__file__))
     
     loading_progress = 0.1
-    loading_message = "Création des dossiers..."
+    loading_message = "Creating folders..."
     
     base_dir = os.path.join(base_path, APP_NAME)
     os.makedirs(base_dir, exist_ok=True)
@@ -227,13 +195,11 @@ def init_directories_with_progress():
     os.makedirs(tools_path, exist_ok=True)
     
     loading_progress = 0.2
-    loading_message = "Vérification de FFmpeg..."
+    loading_message = "Checking FFmpeg..."
     
-    # Chemins des exécutables
     ytdlp_path = os.path.join(tools_path, "yt-dlp.exe")
     ffmpeg_path = os.path.join(tools_path, "ffmpeg.exe")
     
-    # Copier ffmpeg s'il n'existe pas
     if not os.path.exists(ffmpeg_path):
         try:
             source_paths = [
@@ -246,17 +212,15 @@ def init_directories_with_progress():
                 if os.path.exists(source_path):
                     shutil.copy(source_path, ffmpeg_path)
                     break
-        except Exception as e:
-            print(f"Erreur lors de la copie de ffmpeg.exe: {e}")
+        except Exception:
+            pass
     
     loading_progress = 0.4
-    loading_message = "Vérification de yt-dlp..."
+    loading_message = "Checking yt-dlp..."
     
-    # Vérifier et mettre à jour yt-dlp
     try:
         updating = True
         
-        # Vérifier la version locale de yt-dlp
         local_version = None
         if os.path.exists(ytdlp_path):
             try:
@@ -267,14 +231,13 @@ def init_directories_with_progress():
                                       timeout=5)
                 if result.returncode == 0:
                     local_version = result.stdout.strip()
-                    loading_message = f"yt-dlp v{local_version} détecté"
+                    loading_message = f"yt-dlp v{local_version} detected"
             except:
                 pass
         
         loading_progress = 0.5
-        loading_message = "Vérification des mises à jour..."
+        loading_message = "Checking for updates..."
         
-        # Récupérer la dernière version depuis GitHub
         try:
             req = urllib.request.Request(
                 "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest",
@@ -286,10 +249,9 @@ def init_directories_with_progress():
                 latest_version = data.get('tag_name', '').replace('v', '')
                 
                 if local_version != latest_version:
-                    loading_message = f"Mise à jour vers v{latest_version}..."
+                    loading_message = f"Updating to v{latest_version}..."
                     loading_progress = 0.6
                     
-                    # Télécharger la dernière version
                     download_url = None
                     for asset in data.get('assets', []):
                         if asset.get('name') == 'yt-dlp.exe':
@@ -304,22 +266,21 @@ def init_directories_with_progress():
                             os.remove(ytdlp_path)
                         os.rename(temp_path, ytdlp_path)
                         
-                        loading_message = f"yt-dlp mis à jour (v{latest_version})"
+                        loading_message = f"yt-dlp updated (v{latest_version})"
                     else:
-                        loading_message = "Utilisation de la version locale"
+                        loading_message = "Using local version"
                 else:
-                    loading_message = "yt-dlp est à jour"
+                    loading_message = "yt-dlp is up to date"
                     
-        except Exception as e:
-            loading_message = "Connexion impossible, version locale utilisée"
+        except Exception:
+            loading_message = "Connection failed, using local version"
     
-    except Exception as e:
-        loading_message = f"Erreur mise à jour: {e}"
+    except Exception:
+        loading_message = "Update error"
     
     loading_progress = 0.8
-    loading_message = "Installation de yt-dlp..."
+    loading_message = "Installing yt-dlp..."
     
-    # Copier yt-dlp s'il n'existe pas
     if not os.path.exists(ytdlp_path):
         try:
             source_paths = [
@@ -331,122 +292,94 @@ def init_directories_with_progress():
             for source_path in source_paths:
                 if os.path.exists(source_path):
                     shutil.copy(source_path, ytdlp_path)
-                    loading_message = "yt-dlp installé"
+                    loading_message = "yt-dlp installed"
                     break
-        except Exception as e:
-            loading_message = f"Erreur installation yt-dlp: {e}"
+        except Exception:
+            loading_message = "Error installing yt-dlp"
     
     updating = False
     loading_progress = 1.0
-    loading_message = "Prêt!"
+    loading_message = "Ready!"
     
     return base_dir, tools_path
 
-# Charger les images pour l'interface principale
 def load_all_images():
     global background_image, logo_image, device_image, mute_button_image, quit_button_image
     
-    # Charger l'image de fond (même que l'écran de chargement)
     background_image = loading_background_image
-    
-    # Charger le logo (même que l'écran de chargement)
     logo_image = loading_logo_image
     
-    # Charger l'image device
     try:
         device_path = resource_path("resources/images/devicelock.png")
         device_image = pygame.image.load(device_path).convert_alpha()
-        print("  ✓ Device image chargée")
-    except Exception as e:
-        print(f"  ✗ Erreur chargement device: {e}")
+    except Exception:
         device_image = None
     
-    # Charger l'image du bouton mute
     try:
         mute_path = resource_path("resources/icons/buttons/mute.png")
         mute_button_image = pygame.image.load(mute_path).convert_alpha()
         if mute_button_image.get_size() != (30, 30):
             mute_button_image = pygame.transform.scale(mute_button_image, (30, 30))
-        print("  ✓ Mute button chargé")
-    except Exception as e:
-        print(f"  ✗ Erreur chargement bouton mute: {e}")
+    except Exception:
         mute_button_image = None
     
-    # Charger l'image du bouton quit
     try:
         quit_path = resource_path("resources/icons/buttons/QUIT.png")
         quit_button_image = pygame.image.load(quit_path).convert_alpha()
         if quit_button_image.get_size() != (30, 30):
             quit_button_image = pygame.transform.scale(quit_button_image, (30, 30))
-        print("  ✓ Quit button chargé")
-    except Exception as e:
-        print(f"  ✗ Erreur chargement bouton quit: {e}")
+    except Exception:
         quit_button_image = None
 
-# Fonction pour dessiner l'écran de chargement avec le background et logo
 def draw_loading_screen():
-    # Afficher l'image de fond
     if loading_background_image:
         screen.blit(loading_background_image, (0, 0))
     else:
         screen.fill(BLACK)
     
-    # Afficher le logo SILICON_VALLEY en haut
     if loading_logo_image:
         logo_rect = loading_logo_image.get_rect()
         logo_rect.center = (WIDTH//2, 60)
         screen.blit(loading_logo_image, logo_rect)
     
-    # Message de chargement sous le logo
     loading_text = loading_font.render(loading_message, True, TURQUOISE)
     text_x = WIDTH//2 - loading_text.get_width()//2
     text_y = 180
     screen.blit(loading_text, (text_x, text_y))
     
-    # Barre de progression
     bar_width = 400
     bar_height = 20
     bar_x = WIDTH//2 - bar_width//2
     bar_y = 220
     
-    # Fond de la barre
     pygame.draw.rect(screen, DARK_GRAY, (bar_x, bar_y, bar_width, bar_height))
     pygame.draw.rect(screen, GRAY, (bar_x, bar_y, bar_width, bar_height), 2)
     
-    # Progression
     fill_width = int(bar_width * loading_progress)
     if fill_width > 0:
         pygame.draw.rect(screen, CYAN, (bar_x, bar_y, fill_width, bar_height))
     
-    # Pourcentage
     percent_text = font.render(f"{int(loading_progress * 100)}%", True, WHITE)
     percent_x = WIDTH//2 - percent_text.get_width()//2
     percent_y = bar_y + bar_height + 10
     screen.blit(percent_text, (percent_x, percent_y))
 
-# Fonction d'initialisation dans un thread
 def initialization_thread():
     global BASE_DIR, TOOLS_PATH, YTDLP, FFMPEG, ERROR_LOG, current_step, background_image, logo_image
     
-    # Initialiser les dossiers et outils
     BASE_DIR, TOOLS_PATH = init_directories_with_progress()
     YTDLP = os.path.join(TOOLS_PATH, "yt-dlp.exe")
     FFMPEG = os.path.join(TOOLS_PATH, "ffmpeg.exe")
     ERROR_LOG = os.path.join(TOOLS_PATH, "error.log")
     
-    # Charger les images restantes
     load_all_images()
     
-    # Démarrer la musique
     start_background_music()
     
-    # Petite pause pour voir l'écran de chargement à 100%
     time.sleep(0.5)
     
-    # Passer à l'étape suivante
     current_step = "enter_url"
 
-# Fonction pour jouer de la musique
 def music_loop():
     global music_playing
     music_file = resource_path("resources/background.mp3")
@@ -458,8 +391,8 @@ def music_loop():
                 pygame.mixer.music.set_volume(0.7)
             while music_playing:
                 time.sleep(0.1)
-        except Exception as e:
-            print(f"Erreur lors de la lecture de la musique: {e}")
+        except Exception:
+            pass
 
 def start_background_music():
     global music_playing, music_thread
@@ -494,10 +427,9 @@ def get_clipboard_text():
         clipboard_text = root.clipboard_get()
         root.destroy()
         return clipboard_text
-    except Exception as e:
+    except Exception:
         return ""
 
-# Lire le fichier URLs avec timecodes
 def parse_urls_file(file_path):
     urls_data = []
     try:
@@ -518,44 +450,80 @@ def parse_urls_file(file_path):
                         'end_time': end_time,
                         'line': line_num
                     })
-    except Exception as e:
-        print(f"Erreur lors de la lecture du fichier URLs: {e}")
+    except Exception:
+        pass
     
     return urls_data
 
-# Fonction de téléchargement unique avec surveillance de progression améliorée
+def check_existing_files_in_folder(folder):
+    """Count media files already present in destination folder."""
+    count = 0
+    extensions = {'.mp4', '.mp3', '.m4a', '.webm', '.mkv', '.opus', '.flac', '.wav'}
+    try:
+        for f in os.listdir(folder):
+            if os.path.splitext(f)[1].lower() in extensions:
+                count += 1
+    except Exception:
+        pass
+    return count
+
+def check_and_start_download():
+    """After folder chosen: if files exist ask overwrite/duplicate, else go straight to download."""
+    global current_step, overwrite_existing_count, overwrite_choice, download_thread
+    existing = check_existing_files_in_folder(output_dir)
+    if existing > 0:
+        overwrite_existing_count = existing
+        overwrite_choice = ""
+        current_step = "confirm_overwrite"
+    else:
+        overwrite_choice = "overwrite"
+        current_step = "download"
+        download_thread = threading.Thread(target=download_single_video)
+        download_thread.daemon = True
+        download_thread.start()
+
 def download_single_video():
-    global status_message, downloading, progress, progress_text, current_step, last_progress_update, download_completed
-    
+    global status_message, downloading, progress, progress_text, current_step
+    global last_progress_update, download_completed, playlist_total, playlist_done
+
     try:
         downloading = True
         download_completed = False
         progress = 0.0
-        progress_text = "Initialisation..."
+        progress_text = "Initializing..."
         last_progress_update = time.time()
-        
+        playlist_total = 0
+        playlist_done = 0
+
         if not single_url.strip():
-            status_message = "Erreur: Aucune URL fournie"
+            status_message = "Error: No URL provided"
             downloading = False
             return
-        
+
         progress = 0.1
-        progress_text = "Préparation du téléchargement..."
+        progress_text = "Preparing download..."
         last_progress_update = time.time()
-        
+
         if format_choice == "mp4":
             format_opts = ["-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best", "--merge-output-format", "mp4"]
         else:
             format_opts = ["-x", "--audio-format", "mp3", "--audio-quality", "0"]
-        
+
         clip_opts = []
         if start_time.strip() and end_time.strip():
             clip_opts = ["--download-sections", f"*{start_time.strip()}-{end_time.strip()}"]
-        
+
+        # "duplicate" → add autonumber suffix so existing files never get touched
+        # "overwrite"  → default yt-dlp behavior (overwrites same-name file)
+        if overwrite_choice == "duplicate":
+            output_template = os.path.join(output_dir, "%(title)s_%(autonumber)s.%(ext)s")
+        else:
+            output_template = os.path.join(output_dir, "%(title)s.%(ext)s")
+
         progress = 0.2
-        progress_text = "Démarrage du téléchargement..."
+        progress_text = "Starting download..."
         last_progress_update = time.time()
-        
+
         command = [
             YTDLP,
             *format_opts,
@@ -564,15 +532,14 @@ def download_single_video():
             "--progress",
             "--newline",
             "--no-warnings",
-            "-o", os.path.join(output_dir, "%(title)s.%(ext)s"),
+            "-o", output_template,
             single_url.strip()
         ]
-        
+
         progress = 0.3
-        progress_text = "Téléchargement en cours..."
+        progress_text = "Download in progress..."
         last_progress_update = time.time()
-        
-        # Utiliser Popen pour pouvoir lire la progression en temps réel
+
         process = subprocess.Popen(
             command,
             stdout=subprocess.PIPE,
@@ -581,76 +548,92 @@ def download_single_video():
             bufsize=1,
             creationflags=subprocess.CREATE_NO_WINDOW
         )
-        
+
         last_update_time = time.time()
         progress_lines = []
-        
-        # Lire la sortie en temps réel pour détecter la progression
+
         for line in iter(process.stdout.readline, ''):
             line = line.strip()
             if line:
                 progress_lines.append(line)
-                
-                # Essayer d'extraire le pourcentage de progression
+
+                # Detect playlist progress: yt-dlp prints "[download] Downloading item X of Y"
+                if "Downloading item" in line and " of " in line:
+                    try:
+                        parts = line.split()
+                        idx_of = parts.index("of")
+                        playlist_done = int(parts[idx_of - 1])
+                        playlist_total = int(parts[idx_of + 1])
+                    except Exception:
+                        pass
+
                 if "[download]" in line and "%" in line:
                     try:
-                        # Chercher le pourcentage dans la ligne
                         percent_str = ""
                         for part in line.split():
                             if "%" in part:
                                 percent_str = part.replace("%", "")
                                 break
-                        
+
                         if percent_str:
-                            new_progress = float(percent_str) / 100.0
-                            if new_progress > progress:
-                                progress = new_progress
-                                last_progress_update = time.time()
-                                last_update_time = time.time()
-                                progress_text = f"Téléchargement... {int(progress*100)}%"
+                            track_pct = float(percent_str) / 100.0
+                            if playlist_total > 0:
+                                # overall = completed tracks + fraction of current track
+                                overall = (playlist_done - 1 + track_pct) / playlist_total
+                                if overall > progress:
+                                    progress = overall
+                                    last_progress_update = time.time()
+                                    last_update_time = time.time()
+                                    progress_text = f"Downloading... {int(track_pct*100)}%  [{playlist_done}/{playlist_total} tracks]"
+                            else:
+                                new_progress = track_pct
+                                if new_progress > progress:
+                                    progress = new_progress
+                                    last_progress_update = time.time()
+                                    last_update_time = time.time()
+                                    progress_text = f"Downloading... {int(progress*100)}%"
                     except:
                         pass
-                
-                # Détecter la fin du téléchargement
+
                 if "100%" in line or "Deleting original file" in line or "Merging formats" in line:
-                    progress = 1.0
-                    last_progress_update = time.time()
-                    progress_text = "Finalisation..."
-                    break
-            
-            # Vérifier si le processus est terminé
+                    if playlist_total == 0:
+                        progress = 1.0
+                        last_progress_update = time.time()
+                        progress_text = "Finalizing..."
+                        break
+
             if process.poll() is not None:
                 break
-        
-        # Attendre la fin du processus
+
+        process.stdout.close()
         process.wait()
         return_code = process.returncode
-        
-        # Vérifier le résultat
+
         if return_code == 0:
             progress = 1.0
-            progress_text = "Téléchargement terminé!"
-            status_message = "Téléchargement terminé avec succès!"
+            if playlist_total > 1:
+                progress_text = f"Done! {playlist_total} tracks downloaded"
+            else:
+                progress_text = "Download completed!"
+            status_message = "Download completed successfully!"
             download_completed = True
-            # Forcer une mise à jour finale
             last_progress_update = time.time()
             time.sleep(1)
             current_step = "finished"
         else:
             progress = 0.0
-            progress_text = "Erreur lors du téléchargement"
-            status_message = f"Erreur: Code de retour {return_code}"
-            
+            progress_text = "Error during download"
+            status_message = f"Error: Return code {return_code}"
+
     except Exception as e:
         progress = 0.0
-        progress_text = f"Erreur: {str(e)}"
-        status_message = f"Erreur: {str(e)}"
+        progress_text = f"Error: {str(e)}"
+        status_message = f"Error: {str(e)}"
     finally:
         downloading = False
 
-# Fonction de téléchargement multiple
 def download_multiple_videos():
-    global status_message, downloading, progress, progress_text, current_step, last_progress_update
+    global status_message, downloading, progress, progress_text, current_step, last_progress_update, download_completed
     
     try:
         downloading = True
@@ -658,14 +641,14 @@ def download_multiple_videos():
         last_progress_update = time.time()
         
         if not urls_data:
-            status_message = "Erreur: Aucune URL valide dans le fichier"
+            status_message = "Error: No valid URLs in file"
             return
         
         total_urls = len(urls_data)
         
         for i, url_data in enumerate(urls_data, 1):
             progress = i / total_urls
-            progress_text = f"Téléchargement {i}/{total_urls}"
+            progress_text = f"Download {i}/{total_urls}"
             last_progress_update = time.time()
             
             if format_choice == "mp4":
@@ -694,21 +677,21 @@ def download_multiple_videos():
                 timeout=300
             )
         
+        download_completed = True
         progress = 1.0
-        progress_text = f"Terminé! {total_urls} fichiers traités"
-        status_message = f"Téléchargement terminé! {total_urls} fichiers traités"
+        progress_text = f"Completed! {total_urls} files processed"
+        status_message = f"Download completed! {total_urls} files processed"
         last_progress_update = time.time()
         time.sleep(0.5)
         current_step = "finished"
         
     except Exception as e:
         progress = 0.0
-        progress_text = f"Erreur: {str(e)}"
-        status_message = f"Erreur: {str(e)}"
+        progress_text = f"Error: {str(e)}"
+        status_message = f"Error: {str(e)}"
     finally:
         downloading = False
 
-# Classes d'interface
 class FuturisticButton:
     def __init__(self, x, y, width, height, text, color=DARK_GRAY, border_color=CYAN):
         self.rect = pygame.Rect(x, y, width, height)
@@ -719,18 +702,15 @@ class FuturisticButton:
         self.is_pressed = False
         
     def draw(self, surface):
-        # Effet de brillance si survolé
         if self.is_hovered:
             glow_color = (self.border_color[0], self.border_color[1], self.border_color[2], 50)
             glow_surface = pygame.Surface((self.rect.width + 4, self.rect.height + 4), pygame.SRCALPHA)
             pygame.draw.rect(glow_surface, glow_color, glow_surface.get_rect(), border_radius=3)
             surface.blit(glow_surface, (self.rect.x - 2, self.rect.y - 2))
         
-        # Corps du bouton
         pygame.draw.rect(surface, self.color, self.rect)
         pygame.draw.rect(surface, self.border_color, self.rect, 1)
         
-        # Texte
         text_surface = font.render(self.text, True, self.border_color)
         text_rect = text_surface.get_rect(center=self.rect.center)
         surface.blit(text_surface, text_rect)
@@ -762,13 +742,11 @@ class FuturisticInputBox:
             was_active = self.active
             self.active = self.rect.collidepoint(event.pos)
             
-            # Réinitialiser la sélection quand on clique
             if self.active and not was_active:
                 self.select_all = False
                 
         if event.type == KEYDOWN and self.active:
             if event.key == K_a and pygame.key.get_mods() & KMOD_CTRL:
-                # Ctrl+A pour sélectionner tout le texte
                 self.select_all = True
             elif event.key == K_BACKSPACE:
                 if self.select_all:
@@ -795,16 +773,13 @@ class FuturisticInputBox:
         return self.text
         
     def draw(self, surface):
-        # Fond noir avec bordure cyan
         pygame.draw.rect(surface, BLACK, self.rect)
         border_color = CYAN if self.active else GRAY
         pygame.draw.rect(surface, border_color, self.rect, 1)
         
-        # Texte ou placeholder
         display_text = self.text if self.text else self.placeholder
         text_color = WHITE if self.text else GRAY
         
-        # Si le texte est sélectionné, afficher avec un fond de sélection
         if self.select_all and self.active and self.text:
             text_width = font.size(self.text)[0]
             highlight_rect = pygame.Rect(self.rect.x + 5, self.rect.y + 3, text_width, self.rect.height - 6)
@@ -814,7 +789,6 @@ class FuturisticInputBox:
         text_surface = font.render(display_text, True, text_color)
         surface.blit(text_surface, (self.rect.x + 5, self.rect.y + 5))
         
-        # Curseur clignotant
         if self.active and not self.select_all:
             self.cursor_timer += 1
             if self.cursor_timer > 30:
@@ -834,17 +808,14 @@ class ProgressBar:
         self.progress = max(0.0, min(1.0, progress))
         
     def draw(self, surface):
-        # Fond noir
         pygame.draw.rect(surface, BLACK, self.rect)
         pygame.draw.rect(surface, GRAY, self.rect, 1)
         
-        # Barre de progression cyan
         if self.progress > 0:
             fill_width = int(self.rect.width * self.progress)
             fill_rect = pygame.Rect(self.rect.x, self.rect.y, fill_width, self.rect.height)
             pygame.draw.rect(surface, CYAN, fill_rect)
 
-# Fonction pour dessiner le bouton de fermeture avec image
 def draw_quit_button(surface):
     quit_button_rect = pygame.Rect(WIDTH - 40, 10, 30, 30)
     
@@ -860,7 +831,6 @@ def draw_quit_button(surface):
     
     return quit_button_rect
 
-# Fonction pour dessiner le bouton mute avec image
 def draw_mute_button(surface):
     mute_button_rect = pygame.Rect(WIDTH - 40, 50, 30, 30)
     
@@ -885,41 +855,29 @@ def draw_mute_button(surface):
     
     return mute_button_rect
 
-# Création des éléments d'interface
 url_input = FuturisticInputBox(540, 208, 540, 25, "Enter URL here...")
-
-# Boutons principaux
 yes_button = FuturisticButton(540, 240, 80, 25, "yes")
 no_button = FuturisticButton(630, 240, 80, 25, "no") 
 paste_button = FuturisticButton(720, 240, 80, 25, "paste link")
 choose_folder_button = FuturisticButton(810, 240, 120, 25, "Choose folder...")
 restart_button = FuturisticButton(540, 340, 120, 25, "Restart")
 exit_button = FuturisticButton(670, 340, 120, 25, "Exit")
-
-# Boutons de format
 mp4_button = FuturisticButton(540, 275, 80, 25, "MP4")
 mp3_button = FuturisticButton(630, 275, 80, 25, "MP3")
-
-# Boutons de mode
 full_button = FuturisticButton(540, 275, 80, 25, "Full")
 clip_button = FuturisticButton(630, 275, 80, 25, "Clip")
-
-# Timecode inputs
 start_time_input = FuturisticInputBox(540, 310, 80, 25, "Start")
 end_time_input = FuturisticInputBox(630, 310, 80, 25, "End")
-
-# Barre de progression
 progress_bar = ProgressBar(540, 305, 540, 20)
+overwrite_button = FuturisticButton(540, 275, 120, 25, "Overwrite")
+duplicate_button = FuturisticButton(670, 275, 120, 25, "Duplicate")
 
-# CHARGER LES IMAGES POUR L'ÉCRAN DE CHARGEMENT AVANT DE DÉMARRER
 load_loading_screen_images()
 
-# Démarrer le thread d'initialisation
 init_thread = threading.Thread(target=initialization_thread)
 init_thread.daemon = True
 init_thread.start()
 
-# Boucle principale
 running = True
 clock = pygame.time.Clock()
 
@@ -930,18 +888,15 @@ while running:
         if event.type == QUIT:
             running = False
         
-        # Bouton fermeture (seulement si pas en chargement)
         if event.type == MOUSEBUTTONDOWN and current_step != "loading":
             quit_rect = draw_quit_button(screen)
             if quit_rect.collidepoint(event.pos):
                 running = False
             
-            # Bouton mute
             mute_rect = draw_mute_button(screen)
             if mute_rect.collidepoint(event.pos):
                 toggle_mute()
         
-        # Gestion des inputs (seulement si pas en chargement)
         if current_step != "loading":
             if current_step == "enter_url":
                 single_url = url_input.handle_event(event) or single_url
@@ -949,7 +904,6 @@ while running:
                 start_time = start_time_input.handle_event(event) or start_time
                 end_time = end_time_input.handle_event(event) or end_time
         
-        # Gestion des boutons selon l'étape actuelle
         if current_step == "enter_url":
             if paste_button.handle_event(event):
                 clipboard = get_clipboard_text()
@@ -962,7 +916,12 @@ while running:
                 current_step = "choose_format"
             
             if no_button.handle_event(event):
-                current_step = "multiple_files"
+                if single_url.strip() or url_input.text.strip():
+                    single_url = ""
+                    url_input.text = ""
+                    url_input.select_all = False
+                else:
+                    pass
         
         elif current_step == "choose_format":
             if mp4_button.handle_event(event):
@@ -992,17 +951,29 @@ while running:
                     
                     root = tk.Tk()
                     root.withdraw()
-                    folder_selected = filedialog.askdirectory(title="Choisir le dossier de destination")
+                    folder_selected = filedialog.askdirectory(title="Select destination folder")
                     if folder_selected:
                         output_dir = folder_selected
-                        current_step = "download"
-                        download_thread = threading.Thread(target=download_single_video)
-                        download_thread.daemon = True
-                        download_thread.start()
+                        check_and_start_download()
                     
                     root.destroy()
                 except Exception as e:
-                    print(f"Erreur: {e}")
+                    print(f"Error: {e}")
+
+        elif current_step == "confirm_overwrite":
+            if overwrite_button.handle_event(event):
+                overwrite_choice = "overwrite"
+                current_step = "download"
+                download_thread = threading.Thread(target=download_single_video)
+                download_thread.daemon = True
+                download_thread.start()
+
+            if duplicate_button.handle_event(event):
+                overwrite_choice = "duplicate"
+                current_step = "download"
+                download_thread = threading.Thread(target=download_single_video)
+                download_thread.daemon = True
+                download_thread.start()
         
         elif current_step == "finished":
             if restart_button.handle_event(event):
@@ -1015,11 +986,14 @@ while running:
                 url_input.text = ""
                 url_input.select_all = False
                 download_completed = False
+                playlist_total = 0
+                playlist_done = 0
+                overwrite_choice = ""
+                overwrite_existing_count = 0
             
             if exit_button.handle_event(event):
                 running = False
     
-    # Mise à jour des états de survol (seulement si pas en chargement)
     if current_step != "loading":
         yes_button.check_hover(mouse_pos)
         no_button.check_hover(mouse_pos)
@@ -1031,30 +1005,25 @@ while running:
         clip_button.check_hover(mouse_pos)
         restart_button.check_hover(mouse_pos)
         exit_button.check_hover(mouse_pos)
+        overwrite_button.check_hover(mouse_pos)
+        duplicate_button.check_hover(mouse_pos)
     
-    # Dessin selon l'étape
     if current_step == "loading":
-        # Écran de chargement avec background et logo
         draw_loading_screen()
-        
     else:
-        # Interface normale
         if background_image:
             screen.blit(background_image, (0, 0))
         else:
             screen.fill(BLACK)
         
-        # Afficher l'image device à gauche sans redimensionnement
         if device_image:
             screen.blit(device_image, (0, 0))
         
-        # Logo Silicon Valley en haut
         if logo_image:
             logo_rect = logo_image.get_rect()
             logo_rect.center = (WIDTH//2, 60)
             screen.blit(logo_image, logo_rect)
         
-        # Affichage des instructions selon l'étape
         if current_step == "enter_url":
             instructions_text = big_font.render("Enter URL and press YES to continue:", True, TURQUOISE)
             screen.blit(instructions_text, (495, 180))
@@ -1091,6 +1060,13 @@ while running:
             screen.blit(instructions_text, (495, 180))
             
             choose_folder_button.draw(screen)
+
+        elif current_step == "confirm_overwrite":
+            label = f"{overwrite_existing_count} file(s) already in folder. Overwrite or download as duplicate?"
+            instructions_text = big_font.render(label, True, YELLOW)
+            screen.blit(instructions_text, (495, 240))
+            overwrite_button.draw(screen)
+            duplicate_button.draw(screen)
         
         elif current_step == "download":
             instructions_text = big_font.render("Downloading...", True, TURQUOISE)
@@ -1098,7 +1074,7 @@ while running:
             
             current_time = time.time()
             if current_time - last_progress_update > 30 and progress < 1.0 and not download_completed:
-                progress_text = "Problème de connexion... Réessayez"
+                progress_text = "Connection issue... Retrying"
                 if downloading:
                     progress = 0.0
             
@@ -1118,13 +1094,9 @@ while running:
             restart_button.draw(screen)
             exit_button.draw(screen)
         
-        # Bouton de fermeture avec image
         draw_quit_button(screen)
-        
-        # Bouton mute avec image
         draw_mute_button(screen)
         
-        # Status en bas à gauche
         if output_dir:
             status_surface = font.render(f"Destination: {os.path.basename(output_dir)}", True, CYAN)
             screen.blit(status_surface, (10, HEIGHT - 20))
